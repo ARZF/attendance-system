@@ -4,10 +4,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}Account{% endblock %} | Attendance system</title>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="{% static 'js/htmx.min.js' %}" defer></script>
   <script src="{% static 'js/app.js' %}" defer></script>
+  {% block scripts %}{% endblock %}
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   <a class="skip-link" href="#page-content">Skip to content</a>
@@ -16,6 +18,7 @@
     {% if user.is_authenticated %}
     <nav aria-label="Main navigation">
       <a href="{% url 'accounts:home' %}">Account</a>
+      <a href="{% url 'attendance:dashboard' %}">Attendance</a>
       <a href="{% url 'accounts:employees' %}">{% if user.role == 'EMPLOYEE' %}My assignments{% else %}Employees{% endif %}</a>
       {% if user.role == 'ADMIN' %}
       <a href="{% url 'accounts:assignments' %}">Assignments</a>

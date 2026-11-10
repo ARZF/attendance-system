@@ -1,15 +1,60 @@
-<h1>Manage business roles</h1>
-<p>Open assignments must be ended before changing either participant's role.</p>
-<table class="data-table">
-  <caption>Existing user accounts</caption>
-  <thead><tr><th scope="col">Username</th><th scope="col">Business role</th><th scope="col">Account state</th></tr></thead>
-  <tbody>
-  {% for account in users %}
-    <tr>
-      <td data-label="Username"><a href="{% url 'accounts:role_change' account.pk %}">{{ account.username }}</a></td>
-      <td data-label="Business role">{{ account.get_role_display }}</td>
-      <td data-label="Account state">{% if account.is_active %}Active{% else %}Inactive{% endif %}</td>
-    </tr>
-  {% empty %}<tr><td colspan="3">No user accounts.</td></tr>{% endfor %}
-  </tbody>
-</table>
+<div id="user-management-app"
+     data-create-url="{% url 'accounts:admin_user_create' %}"
+     data-update-url="{% url 'accounts:admin_user_detail' 0 %}"
+     data-status-url="{% url 'accounts:admin_user_status' 0 %}">
+  <h1>Manage users</h1>
+  <p>Create accounts, maintain profile information, and control account access. Role changes remain separate because assignments and pending attendance work can block them.</p>
+  <div id="user-management-alert" class="notice" role="alert" hidden></div>
+  <p id="user-management-status" class="status-line" role="status" aria-live="polite"></p>
+
+  <section class="workspace-section" aria-labelledby="create-user-heading">
+    <h2 id="create-user-heading">Create user</h2>
+    <form id="create-user-form" class="form-grid user-form" data-async-form>
+      <div class="form-field"><label for="new-username">Username</label><input id="new-username" name="username" maxlength="150" autocomplete="off" required></div>
+      <div class="form-field"><label for="new-password">Temporary password</label><input id="new-password" name="password" type="password" autocomplete="new-password" required></div>
+      <div class="form-field"><label for="new-role">Business role</label><select id="new-role" name="role"><option value="EMPLOYEE">Employee</option><option value="GUARD">Guard</option><option value="ADMIN">Admin</option></select></div>
+      <div class="form-field"><label for="new-email">Email</label><input id="new-email" name="email" type="email" autocomplete="off"></div>
+      <div class="form-field"><label for="new-first-name">First name</label><input id="new-first-name" name="first_name" maxlength="150" autocomplete="off"></div>
+      <div class="form-field"><label for="new-last-name">Last name</label><input id="new-last-name" name="last_name" maxlength="150" autocomplete="off"></div>
+      <div class="checkbox-field"><input id="new-is-active" name="is_active" type="checkbox" checked><label for="new-is-active">Active account</label></div>
+      <button type="submit">Create user</button>
+    </form>
+  </section>
+
+  <section class="workspace-section" aria-labelledby="existing-users-heading">
+    <h2 id="existing-users-heading">Existing users</h2>
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption>User accounts and business roles</caption>
+        <thead><tr><th scope="col">Username</th><th scope="col">Business role</th><th scope="col">Account state</th><th scope="col">Actions</th></tr></thead>
+        <tbody>
+        {% for account in users %}
+          <tr>
+            <td data-label="Username">{{ account.username }}</td>
+            <td data-label="Business role">{{ account.get_role_display }}</td>
+            <td data-label="Account state">{% if account.is_active %}Active{% else %}Inactive{% endif %}</td>
+            <td data-label="Actions">
+              <details class="user-details">
+                <summary>Manage account</summary>
+                <form class="form-grid user-form" data-user-update="{{ account.pk }}" data-async-form>
+                  <div class="form-field"><label for="username-{{ account.pk }}">Username</label><input id="username-{{ account.pk }}" name="username" value="{{ account.username }}" maxlength="150" required></div>
+                  <div class="form-field"><label for="email-{{ account.pk }}">Email</label><input id="email-{{ account.pk }}" name="email" type="email" value="{{ account.email }}"></div>
+                  <div class="form-field"><label for="first-name-{{ account.pk }}">First name</label><input id="first-name-{{ account.pk }}" name="first_name" value="{{ account.first_name }}" maxlength="150"></div>
+                  <div class="form-field"><label for="last-name-{{ account.pk }}">Last name</label><input id="last-name-{{ account.pk }}" name="last_name" value="{{ account.last_name }}" maxlength="150"></div>
+                  <button type="submit">Save profile</button>
+                </form>
+                <div class="button-row account-actions">
+                  <a href="{% url 'accounts:role_change' account.pk %}">Change role</a>
+                  <form data-user-status="{{ account.pk }}" data-active="{% if account.is_active %}true{% else %}false{% endif %}" data-async-form>
+                    <button type="submit" class="{% if account.is_active %}danger secondary{% else %}secondary{% endif %}">{% if account.is_active %}Deactivate account{% else %}Activate account{% endif %}</button>
+                  </form>
+                </div>
+              </details>
+            </td>
+          </tr>
+        {% empty %}<tr><td colspan="4">No user accounts.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

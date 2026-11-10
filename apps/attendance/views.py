@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views import View
+from django.views.generic import TemplateView
 
 from apps.audit.selectors import audit_history
 from config.security import get_client_ip
@@ -162,6 +163,26 @@ def audit_data(log):
         "details": log.details,
         "ip_address": log.ip_address,
     }
+
+
+class AttendancePageView(RoleRequiredMixin, TemplateView):
+    template_name = "attendance/dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = timezone.localdate()
+        context.update(
+            {
+                "range_start": today - timedelta(days=29),
+                "range_end": today,
+                "visible_employees": (
+                    employees_visible_to(self.request.user).order_by("username")
+                    if self.request.user.role in {"GUARD", "ADMIN"}
+                    else ()
+                ),
+            }
+        )
+        return context
 
 
 class EmployeeDashboardView(RoleRequiredMixin, View):

@@ -4,6 +4,7 @@ from . import views
 
 app_name = "attendance"
 urlpatterns = [
+    path("", views.AttendancePageView.as_view(), name="dashboard"),
     path("requests/check-in/", views.CheckInRequestView.as_view(), name="request_check_in"),
     path("requests/check-out/", views.CheckOutRequestView.as_view(), name="request_check_out"),
     path("requests/", views.OwnRequestHistoryView.as_view(), name="own_requests"),

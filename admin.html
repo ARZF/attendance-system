@@ -1,0 +1,44 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Account | Attendance system</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/js/htmx.min.js" defer></script>
+  <script src="/static/js/app.js" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "ewGLs7DhXlCxofCGoWxlTOjLip4PMCNvrqBvdPhkLTtpCS8VUrZrWYTIrAa88bQH"}'>
+  <a class="skip-link" href="#page-content">Skip to content</a>
+  <header class="site-header">
+    <strong>Attendance system</strong>
+    
+    <nav aria-label="Main navigation">
+      <a href="/">Account</a>
+      <a href="/employees/">Employees</a>
+      
+      <a href="/assignments/">Assignments</a>
+      <a href="/users/">Users</a>
+      
+      <form method="post" action="/logout/">
+        <input type="hidden" name="csrfmiddlewaretoken" value="ewGLs7DhXlCxofCGoWxlTOjLip4PMCNvrqBvdPhkLTtpCS8VUrZrWYTIrAa88bQH"><button type="submit" class="secondary">Log out</button>
+      </form>
+    </nav>
+    
+  </header>
+  <div class="feedback" aria-live="polite">
+    <p id="request-status" role="status"></p>
+    <p id="request-error" role="alert" hidden>Could not save. Refresh the page and try again.</p>
+    
+  </div>
+  <main id="page-content" tabindex="-1"><h1>Your account</h1>
+<dl class="account-details">
+  <dt>Username</dt><dd>demo_admin</dd>
+  <dt>Business role</dt><dd>Admin</dd>
+</dl>
+<p>Your current assignment information is available from the navigation above.</p>
+</main>
+  <footer>Organization timezone: Asia/Tehran</footer>
+</body>
+</html>

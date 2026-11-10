@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Attendance{% endblock %}
+{% block scripts %}<script src="{% static 'js/attendance.js' %}" defer></script>{% endblock %}
+{% block content %}
+<div id="attendance-app" class="workspace"
+     data-role="{{ user.role }}"
+     data-self-dashboard-url="{% url 'attendance:employee_dashboard' %}"
+     data-own-requests-url="{% url 'attendance:own_requests' %}"
+     data-check-in-url="{% url 'attendance:request_check_in' %}"
+     data-check-out-url="{% url 'attendance:request_check_out' %}"
+     data-cancel-request-url="{% url 'attendance:cancel_request' 0 %}"
+     data-report-url="{% url 'attendance:attendance_report' %}"
+     data-scoped-history-url="{% url 'attendance:scoped_employee_history' 0 %}"
+     data-approve-request-url="{% url 'attendance:approve_request' 0 %}"
+     data-reject-request-url="{% url 'attendance:reject_request' 0 %}"
+     data-correct-session-url="{% url 'attendance:correct_session' 0 %}"
+     data-close-session-url="{% url 'attendance:close_session' 0 %}"
+     {% if user.role == 'GUARD' %}data-role-dashboard-url="{% url 'attendance:guard_dashboard' %}"{% endif %}
+     {% if user.role == 'ADMIN' %}
+     data-role-dashboard-url="{% url 'attendance:admin_dashboard' %}"
+     data-admin-requests-url="{% url 'attendance:admin_requests' %}"
+     data-admin-assignments-url="{% url 'attendance:admin_assignments' %}"
+     data-admin-audit-url="{% url 'attendance:admin_audit' %}"
+     {% endif %}>
+  <header class="page-heading">
+    <div>
+      <h1>Attendance</h1>
+      <p>Times are recorded and displayed in Asia/Tehran.</p>
+    </div>
+    <p class="role-label">Signed in as <strong>{{ user.get_role_display }}</strong></p>
+  </header>
+
+  <div id="attendance-alert" class="notice" role="alert" hidden></div>
+  <p id="attendance-status" class="status-line" role="status" aria-live="polite"></p>
+
+  <section class="workspace-section" aria-labelledby="my-attendance-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="my-attendance-heading">My attendance</h2>
+        <p id="active-session">Loading current attendance state.</p>
+      </div>
+    </div>
+
+    <form id="attendance-request-form" class="form-grid" data-async-form>
+      <div class="form-field">
+        <label for="attendance-at">Attendance time</label>
+        <input id="attendance-at" name="attendance_at" type="datetime-local" required>
+        <small>Use the actual time, up to 24 hours ago.</small>
+      </div>
+      <div class="button-row form-actions">
+        <button id="check-in-button" type="submit" value="check-in">
+          {% if user.role == 'ADMIN' %}Record check-in{% else %}Request check-in{% endif %}
+        </button>
+        <button id="check-out-button" type="submit" value="check-out" class="secondary">
+          {% if user.role == 'ADMIN' %}Record check-out{% else %}Request check-out{% endif %}
+        </button>
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table class="data-table compact-table">
+        <caption>My request history</caption>
+        <thead><tr><th scope="col">Type</th><th scope="col">Attendance time</th><th scope="col">Status</th><th scope="col">Reviewed</th><th scope="col">Action</th></tr></thead>
+        <tbody id="own-requests-body"><tr><td colspan="5">Loading requests.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="workspace-section" aria-labelledby="records-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="records-heading">Attendance records</h2>
+        <p>Completed time is clipped to the selected date range.</p>
+      </div>
+      <p id="report-total" class="measure">Total: loading</p>
+    </div>
+    <form id="report-filter" class="filter-form" data-async-form>
+      <div class="form-field">
+        <label for="report-start">Start date</label>
+        <input id="report-start" name="start_date" type="date" value="{{ range_start|date:'Y-m-d' }}" required>
+      </div>
+      <div class="form-field">
+        <label for="report-end">End date</label>
+        <input id="report-end" name="end_date" type="date" value="{{ range_end|date:'Y-m-d' }}" required>
+      </div>
+      {% if user.role != 'EMPLOYEE' %}
+      <div class="form-field">
+        <label for="report-employee">Employee</label>
+        <select id="report-employee" name="employee_id">
+          <option value="">All employees in scope</option>
+          {% for employee in visible_employees %}<option value="{{ employee.pk }}">{{ employee.username }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="form-field">
+        <label for="report-sort">Sort</label>
+        <select id="report-sort" name="sort">
+          <option value="-check_in_at">Newest check-in</option>
+          <option value="check_in_at">Oldest check-in</option>
+          {% if user.role != 'EMPLOYEE' %}<option value="employee__username">Employee username</option>{% endif %}
+        </select>
+      </div>
+      <button type="submit">Load records</button>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption>Sessions in the selected range</caption>
+        <thead><tr>{% if user.role != 'EMPLOYEE' %}<th scope="col">Employee</th>{% endif %}<th scope="col">Check-in</th><th scope="col">Check-out</th><th scope="col">Duration</th></tr></thead>
+        <tbody id="report-body"><tr><td colspan="{% if user.role != 'EMPLOYEE' %}4{% else %}3{% endif %}">Loading attendance records.</td></tr></tbody>
+      </table>
+    </div>
+    <nav class="pagination" aria-label="Attendance record pages">
+      <button id="report-previous" type="button" class="secondary" disabled>Previous</button>
+      <span id="report-page">Page 1</span>
+      <button id="report-next" type="button" class="secondary" disabled>Next</button>
+    </nav>
+  </section>
+
+  {% if user.role == 'GUARD' or user.role == 'ADMIN' %}
+  <section class="workspace-section" aria-labelledby="review-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="review-heading">Requests awaiting review</h2>
+        <p>Review the attendance time before approving or rejecting a request.</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption>Pending requests in your scope</caption>
+        <thead><tr><th scope="col">Employee</th><th scope="col">Type</th><th scope="col">Attendance time</th><th scope="col">Requested</th><th scope="col">Actions</th></tr></thead>
+        <tbody id="review-requests-body"><tr><td colspan="5">Loading pending requests.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="workspace-section" aria-labelledby="scope-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="scope-heading">{% if user.role == 'GUARD' %}Assigned employees{% else %}Organization overview{% endif %}</h2>
+        <p>Working time uses completed sessions in the selected range.</p>
+      </div>
+    </div>
+    <dl id="organization-counts" class="summary-strip" {% if user.role != 'ADMIN' %}hidden{% endif %}>
+      <div><dt>Active employees</dt><dd id="count-employees">Loading</dd></div>
+      <div><dt>Active guards</dt><dd id="count-guards">Loading</dd></div>
+      <div><dt>Active sessions</dt><dd id="count-sessions">Loading</dd></div>
+      <div><dt>Pending requests</dt><dd id="count-requests">Loading</dd></div>
+    </dl>
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption>Attendance overview</caption>
+        <thead><tr><th scope="col">Employee</th><th scope="col">Completed sessions</th><th scope="col">Working time</th><th scope="col">Action</th></tr></thead>
+        <tbody id="overview-body"><tr><td colspan="4">Loading overview.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="workspace-section" aria-labelledby="employee-sessions-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="employee-sessions-heading">Employee sessions</h2>
+        <p>Open a session to correct a recorded time or close a forgotten check-out.</p>
+      </div>
+    </div>
+    <form id="employee-history-filter" class="filter-form" data-async-form>
+      <div class="form-field">
+        <label for="history-employee">Employee</label>
+        <select id="history-employee" name="employee_id" required>
+          <option value="">Choose an employee</option>
+          {% for employee in visible_employees %}<option value="{{ employee.pk }}">{{ employee.username }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit">Load sessions</button>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption id="employee-sessions-caption">Sessions for the selected employee</caption>
+        <thead><tr><th scope="col">Check-in</th><th scope="col">Check-out</th><th scope="col">Duration</th><th scope="col">Actions</th></tr></thead>
+        <tbody id="employee-sessions-body"><tr><td colspan="4">Choose an employee to load sessions.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <dialog id="reject-dialog" aria-labelledby="reject-dialog-title">
+    <form id="reject-form" data-async-form>
+      <h2 id="reject-dialog-title">Reject request</h2>
+      <p id="reject-request-summary"></p>
+      <input id="reject-request-id" name="request_id" type="hidden">
+      <div class="form-field">
+        <label for="rejection-reason">Reason</label>
+        <textarea id="rejection-reason" name="reason" rows="4" required></textarea>
+      </div>
+      <div class="button-row">
+        <button type="submit" class="danger">Reject request</button>
+        <button type="button" class="secondary" data-close-dialog>Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="session-dialog" aria-labelledby="session-dialog-title">
+    <h2 id="session-dialog-title">Adjust session</h2>
+    <p id="session-dialog-summary"></p>
+    <form id="correction-form" data-async-form>
+      <input id="correction-session-id" name="session_id" type="hidden">
+      <div class="form-field">
+        <label for="corrected-field">Time to correct</label>
+        <select id="corrected-field" name="corrected_field" required>
+          <option value="CHECK_IN_AT">Check-in time</option>
+          <option value="CHECK_OUT_AT">Check-out time</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="correction-value">Corrected time</label>
+        <input id="correction-value" name="new_value" type="datetime-local" required>
+      </div>
+      <div class="form-field">
+        <label for="correction-reason">Reason</label>
+        <textarea id="correction-reason" name="reason" rows="3" required></textarea>
+      </div>
+      <div class="button-row">
+        <button type="submit">Save correction</button>
+        <button type="button" class="secondary" data-close-dialog>Cancel</button>
+      </div>
+    </form>
+    <form id="close-session-form" data-async-form hidden>
+      <input id="close-session-id" name="session_id" type="hidden">
+      <div class="form-field">
+        <label for="close-session-time">Check-out time</label>
+        <input id="close-session-time" name="check_out_at" type="datetime-local" required>
+      </div>
+      <div class="form-field">
+        <label for="close-session-reason">Reason</label>
+        <textarea id="close-session-reason" name="reason" rows="3" required></textarea>
+      </div>
+      <div class="button-row">
+        <button type="submit">Close session</button>
+        <button type="button" class="secondary" data-close-dialog>Cancel</button>
+      </div>
+    </form>
+  </dialog>
+  {% endif %}
+
+  {% if user.role == 'ADMIN' %}
+  <section class="workspace-section" aria-labelledby="admin-history-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="admin-history-heading">Administrative history</h2>
+        <p>Inspect requests, guard assignments, and protected audit events.</p>
+      </div>
+    </div>
+    <div class="history-tabs" role="tablist" aria-label="Administrative histories">
+      <button type="button" role="tab" aria-selected="true" aria-controls="request-history-panel" id="request-history-tab" data-history-tab="requests">Requests</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="assignment-history-panel" id="assignment-history-tab" data-history-tab="assignments" class="secondary">Assignments</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="audit-history-panel" id="audit-history-tab" data-history-tab="audit" class="secondary">Audit log</button>
+    </div>
+
+    <div id="request-history-panel" role="tabpanel" aria-labelledby="request-history-tab">
+      <form id="admin-request-filter" class="filter-form" data-async-form>
+        <div class="form-field"><label for="admin-request-status">Status</label><select id="admin-request-status" name="status"><option value="">All</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option><option value="CANCELLED">Cancelled</option></select></div>
+        <div class="form-field"><label for="admin-request-type">Type</label><select id="admin-request-type" name="request_type"><option value="">All</option><option value="CHECK_IN">Check in</option><option value="CHECK_OUT">Check out</option></select></div>
+        <div class="form-field"><label for="admin-request-employee">Employee</label><select id="admin-request-employee" name="employee_id"><option value="">All employees</option>{% for employee in visible_employees %}<option value="{{ employee.pk }}">{{ employee.username }}</option>{% endfor %}</select></div>
+        <button type="submit">Filter requests</button>
+      </form>
+      <div class="table-wrap"><table class="data-table"><caption>Attendance request history</caption><thead><tr><th scope="col">Employee</th><th scope="col">Type</th><th scope="col">Attendance time</th><th scope="col">Status</th><th scope="col">Reviewed</th></tr></thead><tbody id="admin-requests-body"><tr><td colspan="5">Loading request history.</td></tr></tbody></table></div>
+    </div>
+
+    <div id="assignment-history-panel" role="tabpanel" aria-labelledby="assignment-history-tab" hidden>
+      <form id="admin-assignment-filter" class="filter-form" data-async-form>
+        <div class="form-field"><label for="admin-assignment-employee">Employee</label><select id="admin-assignment-employee" name="employee_id"><option value="">All employees</option>{% for employee in visible_employees %}<option value="{{ employee.pk }}">{{ employee.username }}</option>{% endfor %}</select></div>
+        <button type="submit">Filter assignments</button>
+      </form>
+      <div class="table-wrap"><table class="data-table"><caption>Guard assignment history</caption><thead><tr><th scope="col">Employee</th><th scope="col">Guard</th><th scope="col">Started</th><th scope="col">Ended</th></tr></thead><tbody id="admin-assignments-body"><tr><td colspan="4">Choose this tab to load assignment history.</td></tr></tbody></table></div>
+    </div>
+
+    <div id="audit-history-panel" role="tabpanel" aria-labelledby="audit-history-tab" hidden>
+      <form id="admin-audit-filter" class="filter-form" data-async-form>
+        <div class="form-field"><label for="audit-action">Action</label><input id="audit-action" name="action" type="text" maxlength="64"></div>
+        <div class="form-field"><label for="audit-actor">Actor ID</label><input id="audit-actor" name="actor_id" type="number" min="1"></div>
+        <div class="form-field"><label for="audit-target">Target employee ID</label><input id="audit-target" name="target_employee_id" type="number" min="1"></div>
+        <div class="form-field"><label for="audit-start">Start date</label><input id="audit-start" name="start_date" type="date"></div>
+        <div class="form-field"><label for="audit-end">End date</label><input id="audit-end" name="end_date" type="date"></div>
+        <button type="submit">Filter audit log</button>
+      </form>
+      <div class="table-wrap"><table class="data-table"><caption>Protected audit events</caption><thead><tr><th scope="col">Time</th><th scope="col">Action</th><th scope="col">Actor</th><th scope="col">Target</th><th scope="col">Details</th></tr></thead><tbody id="admin-audit-body"><tr><td colspan="5">Choose this tab to load audit events.</td></tr></tbody></table></div>
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

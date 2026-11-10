@@ -1,0 +1,41 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Account | Attendance system</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/js/htmx.min.js" defer></script>
+  <script src="/static/js/app.js" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "SSygT3mK43HoKPUIU2EFTQZB1W0LrWK0RFEP3KWHGIMov2UMo5etJZYSiuriaYVX"}'>
+  <a class="skip-link" href="#page-content">Skip to content</a>
+  <header class="site-header">
+    <strong>Attendance system</strong>
+    
+    <nav aria-label="Main navigation">
+      <a href="/">Account</a>
+      <a href="/employees/">My assignments</a>
+      
+      <form method="post" action="/logout/">
+        <input type="hidden" name="csrfmiddlewaretoken" value="SSygT3mK43HoKPUIU2EFTQZB1W0LrWK0RFEP3KWHGIMov2UMo5etJZYSiuriaYVX"><button type="submit" class="secondary">Log out</button>
+      </form>
+    </nav>
+    
+  </header>
+  <div class="feedback" aria-live="polite">
+    <p id="request-status" role="status"></p>
+    <p id="request-error" role="alert" hidden>Could not save. Refresh the page and try again.</p>
+    
+  </div>
+  <main id="page-content" tabindex="-1"><h1>Your account</h1>
+<dl class="account-details">
+  <dt>Username</dt><dd>demo_employee</dd>
+  <dt>Business role</dt><dd>Employee</dd>
+</dl>
+<p>Your current assignment information is available from the navigation above.</p>
+</main>
+  <footer>Organization timezone: Asia/Tehran</footer>
+</body>
+</html>

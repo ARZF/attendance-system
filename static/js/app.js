@@ -1,5 +1,5 @@
 document.addEventListener("submit", (event) => {
-  if (!event.target.hasAttribute("hx-post")) {
+  if (!event.target.hasAttribute("hx-post") && !event.target.hasAttribute("data-async-form")) {
     event.target.querySelectorAll("button[type='submit']").forEach((button) => {
       button.disabled = true;
     });

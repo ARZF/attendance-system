@@ -1,0 +1,15 @@
+<h1>Manage business roles</h1>
+<p>Open assignments must be ended before changing either participant's role.</p>
+<table class="data-table">
+  <caption>Existing user accounts</caption>
+  <thead><tr><th scope="col">Username</th><th scope="col">Business role</th><th scope="col">Account state</th></tr></thead>
+  <tbody>
+  {% for account in users %}
+    <tr>
+      <td data-label="Username"><a href="{% url 'accounts:role_change' account.pk %}">{{ account.username }}</a></td>
+      <td data-label="Business role">{{ account.get_role_display }}</td>
+      <td data-label="Account state">{% if account.is_active %}Active{% else %}Inactive{% endif %}</td>
+    </tr>
+  {% empty %}<tr><td colspan="3">No user accounts.</td></tr>{% endfor %}
+  </tbody>
+</table>

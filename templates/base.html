@@ -1,0 +1,38 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Account{% endblock %} | Attendance system</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/htmx.min.js' %}" defer></script>
+  <script src="{% static 'js/app.js' %}" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <a class="skip-link" href="#page-content">Skip to content</a>
+  <header class="site-header">
+    <strong>Attendance system</strong>
+    {% if user.is_authenticated %}
+    <nav aria-label="Main navigation">
+      <a href="{% url 'accounts:home' %}">Account</a>
+      <a href="{% url 'accounts:employees' %}">{% if user.role == 'EMPLOYEE' %}My assignments{% else %}Employees{% endif %}</a>
+      {% if user.role == 'ADMIN' %}
+      <a href="{% url 'accounts:assignments' %}">Assignments</a>
+      <a href="{% url 'accounts:users' %}">Users</a>
+      {% endif %}
+      <form method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}<button type="submit" class="secondary">Log out</button>
+      </form>
+    </nav>
+    {% endif %}
+  </header>
+  <div class="feedback" aria-live="polite">
+    <p id="request-status" role="status"></p>
+    <p id="request-error" role="alert" hidden>Could not save. Refresh the page and try again.</p>
+    {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+  </div>
+  <main id="page-content" tabindex="-1">{% block content %}{% endblock %}</main>
+  <footer>Organization timezone: Asia/Tehran</footer>
+</body>
+</html>

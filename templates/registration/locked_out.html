@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Login temporarily locked{% endblock %}
+{% block content %}
+<h1>Login temporarily locked</h1>
+<p role="alert">Too many failed attempts from this username and IP address. Try again in 15 minutes.</p>
+<a href="{% url 'accounts:login' %}">Return to login</a>
+{% endblock %}

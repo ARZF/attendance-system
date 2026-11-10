@@ -1,0 +1,9 @@
+<h1>{% if user.role == 'EMPLOYEE' %}My assignments{% else %}Employees{% endif %}</h1>
+{% if user.role == 'GUARD' %}<p>Only employees currently assigned to you are shown.</p>{% endif %}
+<ul class="record-list">
+{% for employee in employees %}
+  <li><a href="{% url 'accounts:employee_detail' employee.pk %}">{{ employee.username }}</a></li>
+{% empty %}
+  <li>No employees are currently in your scope.</li>
+{% endfor %}
+</ul>

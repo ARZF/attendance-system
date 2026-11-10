@@ -1,0 +1,44 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_DB: attendance_ci
+          POSTGRES_USER: attendance_ci
+          POSTGRES_PASSWORD: ci-only-database-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U attendance_ci -d attendance_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      DJANGO_SECRET_KEY: ci-only-django-key-not-used-outside-isolated-test-environments
+      POSTGRES_DB: attendance_ci
+      POSTGRES_USER: attendance_ci
+      POSTGRES_PASSWORD: ci-only-database-password
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python manage.py check --settings=config.settings.test
+      - run: python manage.py makemigrations --check --dry-run --settings=config.settings.test
+      - run: python -m pytest

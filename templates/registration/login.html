@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<h1>Log in</h1>
+<p>Use the username provided by your administrator.</p>
+<form method="post" class="account-form">
+  {% csrf_token %}
+  {% if form.errors %}<div role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  <label for="{{ form.username.id_for_label }}">Username</label>
+  {{ form.username }}{{ form.username.errors }}
+  <label for="{{ form.password.id_for_label }}">Password</label>
+  {{ form.password }}{{ form.password.errors }}
+  <input type="hidden" name="next" value="{{ next }}">
+  <button type="submit">Log in</button>
+</form>
+{% endblock %}

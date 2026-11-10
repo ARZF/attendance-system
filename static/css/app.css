@@ -1,0 +1,55 @@
+:root { color-scheme: light; font-family: "Segoe UI", system-ui, sans-serif; color: #172b2a; background: #f5f7f6; line-height: 1.5; }
+* { box-sizing: border-box; }
+body { max-width: 70rem; margin: 0 auto; padding: 0 1.25rem; overflow-wrap: anywhere; }
+a { color: #075b53; text-underline-offset: .2em; }
+a[href], button, select, label[for] { cursor: pointer; }
+a:hover { text-decoration-thickness: .15em; }
+a:active { outline: 1px solid currentColor; }
+:focus-visible { outline: 3px solid #075b53; outline-offset: 3px; }
+.skip-link { position: absolute; top: -10rem; }
+.skip-link:focus { top: .5rem; padding: .75rem; background: white; }
+.site-header { padding: 1.25rem 0; border-bottom: 2px solid #172b2a; }
+nav { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1.25rem; margin-top: .75rem; }
+nav a { display: inline-flex; align-items: center; min-height: 44px; }
+nav form { margin-left: auto; }
+main { padding: 1rem 0 2rem; min-height: 45vh; }
+main a { display: inline-flex; align-items: center; min-height: 44px; }
+h1 { font-size: clamp(1.5rem, 4vw, 2rem); line-height: 1.2; margin: 1rem 0; }
+p { max-width: 65ch; }
+footer { padding: 1rem 0; border-top: 1px solid #647573; font-size: .9rem; }
+button, select, input { font: inherit; min-height: 44px; max-width: 100%; border: 1px solid #647573; border-radius: 3px; padding: .5rem .75rem; }
+button { color: white; background: #075b53; border-color: #075b53; }
+button:hover { text-decoration: underline; border-color: #172b2a; }
+button:active { outline: 2px solid #172b2a; outline-offset: 1px; }
+button.secondary { color: #172b2a; background: white; }
+button:disabled, select:disabled { color: #465653; background: #e2e8e6; cursor: not-allowed; text-decoration: none; }
+input, select { color: #172b2a; background: white; min-width: 0; }
+.account-form { display: grid; gap: .75rem; max-width: 26rem; margin-top: 1.5rem; }
+.account-form label { font-weight: 600; }
+.account-form button { justify-self: start; margin-top: .5rem; }
+.assignment-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.assignment-form label { flex-basis: 100%; }
+.end-form { margin-top: .75rem; }
+.data-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 1.5rem 0; }
+caption { text-align: left; font-weight: 600; padding-bottom: .75rem; }
+th, td { text-align: left; vertical-align: top; padding: .9rem .75rem; border-bottom: 1px solid #a8b7b2; }
+th { background: #e2e8e6; }
+.account-details { display: grid; grid-template-columns: max-content 1fr; gap: .5rem 1.25rem; }
+dt { font-weight: 600; }
+dd { margin: 0; }
+.record-list { padding-left: 1.25rem; }
+.record-list a { display: inline-block; min-height: 44px; padding: .5rem 0; }
+.notice, .errorlist, #request-error { color: #782820; }
+.notice { border: 1px solid currentColor; padding: .75rem; }
+.feedback p:empty { display: none; }
+@media (max-width: 45rem) {
+  body { padding: 0 1rem; }
+  nav form { margin-left: 0; }
+  .data-table, .data-table tbody, .data-table tr, .data-table td { display: block; width: 100%; }
+  .data-table thead { display: none; }
+  .data-table tr { border-bottom: 1px solid #647573; padding: .75rem 0; }
+  .data-table td { border: 0; padding: .4rem 0; }
+  .data-table td[data-label]::before { content: attr(data-label) ": "; display: block; font-weight: 600; }
+  .assignment-form select, .assignment-form button, .end-form button { width: 100%; }
+  .account-details { grid-template-columns: 1fr; }
+}

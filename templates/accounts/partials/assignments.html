@@ -1,0 +1,44 @@
+<h1>Manage assignments</h1>
+<p>Changes take effect immediately. Replacing a guard preserves the previous assignment.</p>
+{% if errors %}<div class="notice" role="alert"><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
+{% if saved %}<p role="status">Assignment saved.</p>{% endif %}
+<table class="data-table">
+  <caption>Active employees and their current guards</caption>
+  <thead><tr><th scope="col">Employee</th><th scope="col">Current guard</th><th scope="col">Actions</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td data-label="Employee"><a href="{% url 'accounts:employee_detail' row.employee.pk %}">{{ row.employee.username }}</a></td>
+      <td data-label="Current guard">{% if row.assignment %}{{ row.assignment.guard.username }}{% else %}Not assigned{% endif %}</td>
+      <td data-label="Actions">
+        {% if guards %}
+        <form method="post" action="{% url 'accounts:assignments' %}" class="assignment-form"
+              hx-post="{% url 'accounts:assignments' %}" hx-target="#page-content" hx-swap="innerHTML"
+              hx-disabled-elt="find button[type='submit']">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="assign">
+          <input type="hidden" name="employee_id" value="{{ row.employee.pk }}">
+          <input type="hidden" name="expected_assignment_id" value="{{ row.assignment.pk|default:'' }}">
+          <label for="guard-{{ row.employee.pk }}">Guard for {{ row.employee.username }}</label>
+          <select id="guard-{{ row.employee.pk }}" name="guard_id" required>
+            {% for guard in guards %}<option value="{{ guard.pk }}"{% if guard.pk == row.assignment.guard_id %} selected{% endif %}>{{ guard.username }}</option>{% endfor %}
+          </select>
+          <button type="submit">{% if row.assignment %}Replace guard{% else %}Assign guard{% endif %}</button>
+        </form>
+        {% else %}<p>No active guards available.</p>{% endif %}
+        {% if row.assignment %}
+        <form method="post" action="{% url 'accounts:assignments' %}" class="end-form"
+              hx-post="{% url 'accounts:assignments' %}" hx-target="#page-content" hx-swap="innerHTML"
+              hx-disabled-elt="find button[type='submit']">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="end">
+          <input type="hidden" name="employee_id" value="{{ row.employee.pk }}">
+          <input type="hidden" name="assignment_id" value="{{ row.assignment.pk }}">
+          <button type="submit" class="secondary">End {{ row.employee.username }}'s assignment</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="3">No active employees available.</td></tr>{% endfor %}
+  </tbody>
+</table>

@@ -1,0 +1,8 @@
+<h1>Business role: {{ target_user.username }}</h1>
+<p>This does not change Django staff or superuser permissions.</p>
+<form method="post" class="account-form">
+  {% csrf_token %}
+  {% if form.errors %}<div role="alert">{{ form.errors }}</div>{% endif %}
+  {{ form.role.label_tag }}{{ form.role }}
+  <button type="submit">Save business role</button>
+</form>

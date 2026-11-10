@@ -1,4 +1,5 @@
 import pytest
+from django.utils import timezone
 from django.contrib import admin
 from django.test import Client, RequestFactory
 from django.urls import reverse
@@ -128,6 +129,36 @@ def test_role_change_page_calls_audited_service(client, actors):
     assert client.get(url).status_code == 200
     assert client.post(url, {"role": "GUARD"}).status_code == 302
     assert AuditLog.objects.get(action="ROLE_CHANGED").target_employee_id == actors["employee"].pk
+
+
+def test_assignment_form_never_accepts_submitted_timestamps(client, actors):
+    client.force_login(actors["admin"])
+    before = timezone.now()
+    response = client.post(reverse("accounts:assignments"), {
+        "action": "assign", "employee_id": actors["employee"].pk,
+        "guard_id": actors["guard"].pk, "started_at": "2099-01-01T00:00:00Z",
+    })
+    assert response.status_code == 302
+    assert before <= GuardAssignment.objects.get().started_at <= timezone.now()
+
+
+def test_admin_can_end_inactive_employees_assignment_from_page(client, actors):
+    assignment = assign_guard(
+        actor=actors["admin"], employee_id=actors["employee"].pk,
+        guard_id=actors["guard"].pk, expected_assignment_id=None,
+    )
+    actors["employee"].is_active = False
+    actors["employee"].save(update_fields=["is_active"])
+    client.force_login(actors["admin"])
+    url = reverse("accounts:assignments")
+    response = client.get(url)
+    assert b"Inactive account" in response.content
+    assert b"name=\"assignment_id\"" in response.content
+    assert client.post(url, {
+        "action": "end", "employee_id": actors["employee"].pk, "assignment_id": assignment.pk,
+    }).status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.ended_at is not None
 
 
 @pytest.mark.parametrize("name", ["employee", "guard"])

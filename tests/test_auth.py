@@ -5,11 +5,14 @@ import pytest
 from axes.helpers import get_client_ip_address, get_cool_off
 from axes.models import AccessAttempt
 from django.contrib.sessions.models import Session
+from django.contrib.sessions.backends.db import SessionStore
+from django.core.exceptions import PermissionDenied
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.audit.models import AuditLog
+from apps.accounts.services import login_user as start_session
 
 pytestmark = pytest.mark.django_db
 PASSWORD = "Test-only!Authentication-8349"
@@ -110,6 +113,15 @@ def test_spoofed_forwarded_headers_cannot_bypass_lockout(client, login_user):
     assert AccessAttempt.objects.get(username=login_user.username).ip_address == "192.0.2.10"
 
 
+def test_user_agent_changes_do_not_change_lockout_key_or_store_passwords(client, login_user):
+    wrong_password = "Test-only!Do-not-store-this-password"
+    for attempt in range(5):
+        response = post_login(client, password=wrong_password, HTTP_USER_AGENT=f"client-{attempt}")
+    assert response.status_code == 429
+    assert AccessAttempt.objects.filter(username=login_user.username).count() == 5
+    assert all(wrong_password not in entry.post_data for entry in AccessAttempt.objects.all())
+
+
 @pytest.mark.parametrize("peer,header,expected", [
     ("10.0.0.5", "198.51.100.7", "198.51.100.7"),
     ("192.0.2.5", "198.51.100.7", "192.0.2.5"),
@@ -147,3 +159,25 @@ def test_login_audit_failure_leaves_no_authenticated_database_session(client, lo
         post_login(client)
     assert not AuditLog.objects.exists()
     assert all("_auth_user_id" not in session.get_decoded() for session in Session.objects.all())
+
+
+def test_login_service_rechecks_active_state_under_lock(login_user):
+    request = RequestFactory().post(reverse("accounts:login"))
+    request.session = SessionStore()
+    login_user.is_active = False
+    login_user.save(update_fields=["is_active"])
+    with pytest.raises(PermissionDenied):
+        start_session(request=request, user=login_user)
+    assert not AuditLog.objects.exists()
+
+
+def test_logout_audit_failure_rolls_back_database_session_deletion(client, login_user, monkeypatch):
+    client.force_login(login_user)
+    key = client.session.session_key
+    def fail(**kwargs):
+        raise RuntimeError("audit unavailable")
+    monkeypatch.setattr("apps.accounts.services.log_activity", fail)
+    with pytest.raises(RuntimeError):
+        client.post(reverse("accounts:logout"))
+    assert Session.objects.filter(session_key=key).exists()
+    assert not AuditLog.objects.exists()

@@ -4,7 +4,7 @@ from django.db import transaction
 
 from apps.accounts.services import change_role
 from apps.attendance.selectors import has_pending_requests
-from apps.attendance.services import assign_guard
+from apps.attendance.services import assign_guard, end_assignment
 from apps.audit.models import AuditLog
 from apps.audit.services import log_activity
 
@@ -47,6 +47,16 @@ def test_pending_request_hook_blocks_role_change(actors, monkeypatch):
 
 def test_pending_request_selector_is_explicit_phase_three_stub(actors):
     assert has_pending_requests(actors["employee"].pk) is False
+
+
+def test_closed_assignment_history_does_not_block_role_change(actors):
+    assignment = assign_guard(
+        actor=actors["admin"], employee_id=actors["employee"].pk,
+        guard_id=actors["guard"].pk, expected_assignment_id=None,
+    )
+    end_assignment(actor=actors["admin"], employee_id=actors["employee"].pk, assignment_id=assignment.pk)
+    user = change_role(actor=actors["admin"], user_id=actors["employee"].pk, role="GUARD")
+    assert user.role == "GUARD"
 
 
 def test_role_audit_failure_rolls_back_user_change(actors, monkeypatch):

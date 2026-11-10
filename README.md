@@ -1,8 +1,10 @@
 # Attendance system
 
-Phases 1 and 2: Python 3.13, Django 5.2.19 LTS, PostgreSQL 17, and pytest-django.
-Authentication, scoped assignment history, and administrator assignment/role management
-are available. There is no self-registration or attendance/dashboard implementation yet.
+The backend through Phase 8 uses Python 3.13, Django 5.2.19 LTS, PostgreSQL 17,
+and pytest-django. Authentication, scoped guard assignments, attendance workflows,
+corrections, protected auditing, administrative user management, JSON dashboards,
+reporting, and HTTP integration are available. There is no self-registration or
+attendance frontend.
 
 ## Development setup (PowerShell)
 
@@ -132,8 +134,8 @@ The database additionally enforces one open assignment, valid dates, no self-ass
 and no overlapping open **or closed** employee assignment periods.
 
 Role changes lock the target User and check both employee-side and guard-side open
-assignments. **Pending-request checking is an explicit stub returning False until
-Phase 3**, with a test showing that the future hook blocks a role change when True.
+assignments. They also block request owners and currently assigned guards while they
+have unresolved attendance requests.
 
 Successful login/logout, development seed creation, role changes, and assignment
 actions write minimal audit events inside their action transaction. Authenticated
@@ -146,21 +148,163 @@ with its license, without a CDN dependency. The shared body supplies the CSRF to
 through `hx-headers`; partial endpoints apply the same authorization as full pages.
 Expired sessions use `HX-Redirect`, and buttons disable while requests are in flight.
 
+## Phase 3 attendance core
+
+`AttendanceSession` stores approved attendance periods. An open session has no
+`check_out_at`. PostgreSQL enforces one open session per user, positive duration, and
+non-overlapping session ranges. Adjacent sessions are allowed.
+
+`AttendanceRequest` stores check-in and check-out requests. `requested_at` is the
+creation timestamp, so a duplicate `created_at` field is intentionally omitted.
+Database constraints enforce valid request/review states, one pending request per
+user and request type, no self-review, and valid links between requests and sessions.
+
+The attendance service exposes:
+
+- `submit_check_in_request(actor=..., attendance_at=...)`
+- `submit_check_out_request(actor=..., attendance_at=...)`
+- `approve_attendance_request(reviewer=..., request_id=...)`
+- `reject_attendance_request(reviewer=..., request_id=..., reason=...)`
+
+The actor is always the attendance subject; no employee ID is accepted for submission.
+All roles may submit for themselves. Employee requests can be reviewed by their current
+guard or any admin. Guard requests require an admin. Admin requests are approved by the
+system in the submission transaction, with `reviewed_by=None`, `auto_approved=True`,
+and the submitting admin as the audit actor. Human reviewers cannot review themselves.
+
+Both request types use the requested `attendance_at`, never review time. Times must be
+timezone-aware, not in the future, and at most 24 hours old when submitted. Approval
+revalidates that window against the saved `requested_at`, so review delay does not make
+a valid request stale. Check-in cannot overlap an active or previous session. Check-out
+requires the original active session and must be later than its check-in.
+
+Submission, approval, rejection, session creation, and session completion write audit
+records in the same transaction. The write path locks the employee User row before the
+request row, then rechecks request state and reviewer scope. Audit database immutability
+remains Phase 6 work.
+
+Phase 3 adds backend models, selectors, services, migration, and read-only Django admin
+registrations only. HTTP forms/routes and dashboards are deferred.
+
+## Corrections and forgotten check-outs
+
+`AttendanceCorrection` preserves every check-in/check-out change with the actor,
+previous value, new value, reason, and timestamp. Corrections lock the employee and
+session, validate duration and overlaps, and write an audit row in the same transaction.
+Guards may correct currently assigned employees through exactly 14 days after check-in;
+admins have no age limit. Nobody may correct their own session.
+
+An active session cannot receive an ordinary check-out correction. The explicit
+`close_attendance_session()` service closes forgotten check-outs and refuses to run
+while a check-out request is pending.
+
+## Protected audit log
+
+Audit rows include actor, target employee, generic target type/ID, action, details,
+timestamp, and optional IP address. The audit service rejects sensitive detail keys.
+Failed logins are recorded without passwords or authentication tokens.
+
+`audit.0002_audit_protection` installs PostgreSQL triggers that reject UPDATE, DELETE,
+and TRUNCATE in development and production. Ordinary test settings intentionally skip
+the triggers because transactional Django tests flush tables. Production must use a
+non-owner runtime database role with no audit mutation privileges; see
+[`docs/audit-database-role.md`](docs/audit-database-role.md).
+
+## Administrative user management
+
+Business admins can create users, update profile fields, activate/deactivate accounts,
+and change roles. Passwords are validated and hashed by Django. The services block
+self-deactivation, removal of the last active business admin, role/deactivation changes
+with active assignments or pending attendance responsibilities, and all non-admin
+callers. Business roles remain independent of Django staff/superuser flags.
+
+Existing assignment services continue to create, end, and replace active assignments
+without deleting history. Guards cannot manage assignments.
+
+## Dashboard and reporting backend
+
+Employee, guard, and admin dashboard endpoints return JSON. Date-range reports use
+PostgreSQL duration aggregation and clip completed sessions to the requested range.
+History/report endpoints support authorized employee filters, allowlisted sorting,
+and pagination up to 100 rows per page. Guard queries are limited to current assignments
+and use related-object loading to avoid per-row lookups. Working-time totals include
+completed sessions only; active-session state is returned separately.
+
+## Backend HTTP endpoints
+
+Authentication and existing management pages:
+
+- `GET|POST /login/`, `POST /logout/`
+- `GET|POST /assignments/`, admin assignment management
+- `GET /employees/<id>/`, scoped assignment history
+- `GET|POST /users/<id>/role/`, admin role page
+
+Administrative user JSON endpoints:
+
+- `POST /management/users/create/`
+- `GET|POST /management/users/<id>/`
+- `POST /management/users/<id>/status/`
+- `POST /management/users/<id>/role/`
+
+Attendance request and employee endpoints:
+
+- `POST /attendance/requests/check-in/`
+- `POST /attendance/requests/check-out/`
+- `GET /attendance/requests/`
+- `GET /attendance/requests/<id>/`
+- `POST /attendance/requests/<id>/cancel/`
+- `GET /attendance/history/`
+- `GET /attendance/dashboard/employee/`
+
+Guard and shared reviewer endpoints:
+
+- `GET /attendance/guard/employees/`
+- `GET /attendance/guard/requests/pending/`
+- `GET /attendance/guard/employees/<id>/history/`
+- `POST /attendance/requests/<id>/approve/`
+- `POST /attendance/requests/<id>/reject/`
+- `POST /attendance/sessions/<id>/correct/`
+- `POST /attendance/sessions/<id>/close/`
+- `GET /attendance/dashboard/guard/`
+
+Admin and reporting endpoints:
+
+- `GET /attendance/admin/requests/`
+- `GET /attendance/admin/assignments/`
+- `GET /attendance/admin/audit/`
+- `GET /attendance/dashboard/admin/`
+- `GET /attendance/reports/attendance/`
+
+State-changing endpoints require POST and Django CSRF protection. Views validate forms
+and pass the authenticated user into services; client-supplied roles, actors, reviewers,
+and attendance employee IDs are never trusted for authorization. Out-of-scope employee,
+request, and session IDs return 404 where disclosure would create an IDOR risk.
+
+Apply the migration before using these services:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
 ## Agreed phase boundaries
 
 Implementation stops after each phase for approval.
 
 1. Foundation (accepted).
-2. Authentication and assignments (current); minimal `AuditLog`/`log_activity`, including
+2. Authentication and assignments (accepted); minimal `AuditLog`/`log_activity`, including
    role-change and assignment-change auditing. Assignment history belongs in
    `attendance`, with an employee/range PostgreSQL exclusion constraint using
    `tstzrange(started_at, ended_at, '[)')`, `&&`, and `btree_gist`.
-3. Attendance requests, sessions, submission/cancellation, constraints, validation.
-4. Approval routing, locking, and real PostgreSQL concurrency tests.
-5. Corrections and forgotten check-out closure.
-6. Audit enforcement, failed-login events, read-only administration, audit pages.
-7. Authorized template/HTMX dashboards and partials.
-8. Operational hardening and production deployment/backup documentation.
+3. Attendance requests, sessions, submission, approval/rejection services, constraints,
+   timestamp validation, and audit integration (implemented).
+4. Corrections and forgotten check-out closure (implemented).
+5. Audit metadata, failed-login events, database mutation triggers, and audit filtering
+   (implemented; restricted production role setup remains a deployment step).
+6. Administrative user and guard-assignment management (implemented).
+7. Scoped dashboard selectors, aggregation, filtering, pagination, and JSON endpoints
+   (implemented).
+8. Attendance, correction, cancellation, management, reporting, and audit HTTP endpoints
+   (implemented). Frontend work remains separate.
 
 Dependency direction: accounts may import attendance/audit; attendance may import
 audit; audit imports neither. Swappable `AUTH_USER_MODEL` references are allowed.
@@ -181,6 +325,5 @@ business authorization; assignment and audit models are read-only there.
 
 Phase 6's audit UPDATE/DELETE/TRUNCATE triggers will be active in development and
 production, **not ordinary test settings**, because transaction tests flush with
-TRUNCATE. A separate enforcement test will explicitly install and exercise the
-triggers, then remove them before test teardown. Production will use a restricted
-application DB role. Privileged database-owner tampering is outside that guarantee.
+TRUNCATE. Production must use the documented restricted application role. Privileged
+database-owner tampering is outside that guarantee.

@@ -24,6 +24,9 @@ button:active { outline: 2px solid #172b2a; outline-offset: 1px; }
 button.secondary { color: #172b2a; background: white; }
 button:disabled, select:disabled { color: #465653; background: #e2e8e6; cursor: not-allowed; text-decoration: none; }
 input, select { color: #172b2a; background: white; min-width: 0; }
+input:hover, select:hover { border-color: #172b2a; }
+input:active, select:active { border-width: 2px; }
+input:disabled, select:disabled { color: #465653; background: #e2e8e6; cursor: not-allowed; }
 .account-form { display: grid; gap: .75rem; max-width: 26rem; margin-top: 1.5rem; }
 .account-form label { font-weight: 600; }
 .account-form button { justify-self: start; margin-top: .5rem; }

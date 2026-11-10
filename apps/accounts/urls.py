@@ -12,4 +12,24 @@ urlpatterns = [
     path("assignments/", views.AssignmentManagementView.as_view(), name="assignments"),
     path("users/", views.UsersView.as_view(), name="users"),
     path("users/<int:user_id>/role/", views.RoleChangeView.as_view(), name="role_change"),
+    path(
+        "management/users/create/",
+        views.AdminUserCreateView.as_view(),
+        name="admin_user_create",
+    ),
+    path(
+        "management/users/<int:user_id>/",
+        views.AdminUserDetailView.as_view(),
+        name="admin_user_detail",
+    ),
+    path(
+        "management/users/<int:user_id>/status/",
+        views.AdminUserStatusView.as_view(),
+        name="admin_user_status",
+    ),
+    path(
+        "management/users/<int:user_id>/role/",
+        views.AdminUserRoleView.as_view(),
+        name="admin_user_role",
+    ),
 ]

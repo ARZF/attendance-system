@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.views import LoginView as DjangoLoginView, LogoutView as DjangoLogoutView
 from django.core.exceptions import ValidationError
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
 from django.views import View
 
@@ -10,15 +10,53 @@ from apps.attendance.selectors import (
 )
 from apps.attendance.services import assign_guard, end_assignment
 
-from .forms import AssignmentForm, EndAssignmentForm, RoleChangeForm
+from .forms import (
+    AccountStatusForm,
+    AssignmentForm,
+    BusinessUserCreateForm,
+    BusinessUserUpdateForm,
+    EndAssignmentForm,
+    RoleChangeForm,
+)
 from .permissions import AdminRequiredMixin, RoleRequiredMixin
 from .selectors import all_users, user_by_id
-from .services import change_role, login_user, logout_user
+from .security import get_client_ip
+from .services import (
+    change_role,
+    create_business_user,
+    login_user,
+    logout_user,
+    set_user_active,
+    update_user_information,
+)
 
 
 def render_page(request, page, context=None):
     directory = "accounts/partials" if request.headers.get("HX-Request") == "true" else "accounts"
     return render(request, f"{directory}/{page}.html", context or {})
+
+
+def form_error_response(form):
+    return JsonResponse(
+        {"errors": {field: [str(error) for error in errors] for field, errors in form.errors.items()}},
+        status=400,
+    )
+
+
+def validation_error_response(error):
+    return JsonResponse({"errors": error.messages}, status=400)
+
+
+def user_data(user):
+    return {
+        "id": user.pk,
+        "username": user.username,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "role": user.role,
+        "is_active": user.is_active,
+    }
 
 
 class LoginView(DjangoLoginView):
@@ -70,7 +108,11 @@ class AssignmentManagementView(AdminRequiredMixin, View):
             else:
                 service = assign_guard if action == "assign" else end_assignment
                 try:
-                    service(actor=request.user, **form.cleaned_data)
+                    service(
+                        actor=request.user,
+                        ip_address=get_client_ip(request),
+                        **form.cleaned_data,
+                    )
                 except ValidationError as exc:
                     errors = exc.messages
         if not errors and request.headers.get("HX-Request") != "true":
@@ -97,10 +139,85 @@ class RoleChangeView(AdminRequiredMixin, View):
         form = RoleChangeForm(request.POST)
         if form.is_valid():
             try:
-                change_role(actor=request.user, user_id=user.pk, **form.cleaned_data)
+                change_role(
+                    actor=request.user,
+                    user_id=user.pk,
+                    ip_address=get_client_ip(request),
+                    **form.cleaned_data,
+                )
             except ValidationError as exc:
                 form.add_error(None, "; ".join(exc.messages))
             else:
                 messages.success(request, "Business role saved.")
                 return redirect("accounts:home" if user.pk == request.user.pk else "accounts:users")
         return render_page(request, "role_change", {"target_user": user, "form": form})
+
+
+class AdminUserCreateView(AdminRequiredMixin, View):
+    def post(self, request):
+        form = BusinessUserCreateForm(request.POST)
+        if not form.is_valid():
+            return form_error_response(form)
+        try:
+            user = create_business_user(
+                actor=request.user,
+                ip_address=get_client_ip(request),
+                **form.cleaned_data,
+            )
+        except ValidationError as error:
+            return validation_error_response(error)
+        return JsonResponse({"user": user_data(user)}, status=201)
+
+
+class AdminUserDetailView(AdminRequiredMixin, View):
+    def get(self, request, user_id):
+        return JsonResponse({"user": user_data(user_by_id(user_id))})
+
+    def post(self, request, user_id):
+        form = BusinessUserUpdateForm(request.POST)
+        if not form.is_valid():
+            return form_error_response(form)
+        try:
+            user = update_user_information(
+                actor=request.user,
+                user_id=user_id,
+                ip_address=get_client_ip(request),
+                **form.cleaned_data,
+            )
+        except ValidationError as error:
+            return validation_error_response(error)
+        return JsonResponse({"user": user_data(user)})
+
+
+class AdminUserStatusView(AdminRequiredMixin, View):
+    def post(self, request, user_id):
+        form = AccountStatusForm(request.POST)
+        if not form.is_valid():
+            return form_error_response(form)
+        try:
+            user = set_user_active(
+                actor=request.user,
+                user_id=user_id,
+                ip_address=get_client_ip(request),
+                **form.cleaned_data,
+            )
+        except ValidationError as error:
+            return validation_error_response(error)
+        return JsonResponse({"user": user_data(user)})
+
+
+class AdminUserRoleView(AdminRequiredMixin, View):
+    def post(self, request, user_id):
+        form = RoleChangeForm(request.POST)
+        if not form.is_valid():
+            return form_error_response(form)
+        try:
+            user = change_role(
+                actor=request.user,
+                user_id=user_id,
+                ip_address=get_client_ip(request),
+                **form.cleaned_data,
+            )
+        except ValidationError as error:
+            return validation_error_response(error)
+        return JsonResponse({"user": user_data(user)})

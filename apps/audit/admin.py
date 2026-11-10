@@ -25,5 +25,13 @@ class ReadOnlyModelAdmin(admin.ModelAdmin):
 
 @admin.register(AuditLog)
 class AuditLogAdmin(ReadOnlyModelAdmin):
-    list_display = ("created_at", "actor", "target_employee", "action")
+    list_display = (
+        "created_at",
+        "actor",
+        "target_employee",
+        "action",
+        "target_type",
+        "target_id",
+        "ip_address",
+    )
     readonly_fields = (*list_display, "details")

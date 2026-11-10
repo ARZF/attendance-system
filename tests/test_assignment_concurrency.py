@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from apps.accounts.services import change_role
 from apps.attendance.models import GuardAssignment
-from apps.attendance.services import assign_guard
+from apps.attendance.services import assign_guard, end_assignment
 from apps.audit.models import AuditLog
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -124,3 +124,24 @@ def test_concurrent_guard_role_change_and_assignment_cannot_violate_roles(actors
     else:
         assert actors["guard"].role == "EMPLOYEE"
     assert AuditLog.objects.count() == 1
+
+
+def test_concurrent_end_and_replace_cannot_end_a_new_assignment(actors):
+    initial = assign_guard(
+        actor=actors["admin"], employee_id=actors["employee"].pk,
+        guard_id=actors["guard"].pk, expected_assignment_id=None,
+    )
+    results = run_concurrently([
+        lambda: end_assignment(
+            actor=actors["admin"], employee_id=actors["employee"].pk, assignment_id=initial.pk,
+        ),
+        lambda: assign_guard(
+            actor=actors["admin"], employee_id=actors["employee"].pk,
+            guard_id=actors["other_guard"].pk, expected_assignment_id=initial.pk,
+        ),
+    ])
+    assert sorted(results) == ["ok", "rejected"]
+    initial.refresh_from_db()
+    assert initial.ended_at is not None
+    assert GuardAssignment.objects.filter(ended_at__isnull=True).count() == GuardAssignment.objects.count() - 1
+    assert AuditLog.objects.count() == 2

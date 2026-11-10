@@ -3,15 +3,15 @@
 {% if errors %}<div class="notice" role="alert"><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
 {% if saved %}<p role="status">Assignment saved.</p>{% endif %}
 <table class="data-table">
-  <caption>Active employees and their current guards</caption>
+  <caption>Employees and their current guards</caption>
   <thead><tr><th scope="col">Employee</th><th scope="col">Current guard</th><th scope="col">Actions</th></tr></thead>
   <tbody>
   {% for row in rows %}
     <tr>
-      <td data-label="Employee"><a href="{% url 'accounts:employee_detail' row.employee.pk %}">{{ row.employee.username }}</a></td>
+      <td data-label="Employee"><a href="{% url 'accounts:employee_detail' row.employee.pk %}">{{ row.employee.username }}</a>{% if not row.employee.is_active %}<p>Inactive account</p>{% endif %}</td>
       <td data-label="Current guard">{% if row.assignment %}{{ row.assignment.guard.username }}{% else %}Not assigned{% endif %}</td>
       <td data-label="Actions">
-        {% if guards %}
+        {% if guards and row.employee.is_active %}
         <form method="post" action="{% url 'accounts:assignments' %}" class="assignment-form"
               hx-post="{% url 'accounts:assignments' %}" hx-target="#page-content" hx-swap="innerHTML"
               hx-disabled-elt="find button[type='submit']">
@@ -25,6 +25,7 @@
           </select>
           <button type="submit">{% if row.assignment %}Replace guard{% else %}Assign guard{% endif %}</button>
         </form>
+        {% elif not row.employee.is_active %}<p>Inactive employees can only have assignments ended.</p>
         {% else %}<p>No active guards available.</p>{% endif %}
         {% if row.assignment %}
         <form method="post" action="{% url 'accounts:assignments' %}" class="end-form"
@@ -39,6 +40,6 @@
         {% endif %}
       </td>
     </tr>
-  {% empty %}<tr><td colspan="3">No active employees available.</td></tr>{% endfor %}
+  {% empty %}<tr><td colspan="3">No employees available.</td></tr>{% endfor %}
   </tbody>
 </table>
